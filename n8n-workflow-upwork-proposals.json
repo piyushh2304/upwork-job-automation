@@ -1,0 +1,357 @@
+{
+  "name": "Upwork Job Scraper - Proposal Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "upwork-jobs",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "185e9e66-33e9-4071-8b57-164f062a5546",
+      "name": "Receive Jobs from Extension",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        1312
+      ],
+      "webhookId": "upwork-jobs-webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Jobs received\" } }}",
+        "options": {}
+      },
+      "id": "1d7de2fc-8ca4-4913-89a2-2a600edc2fc2",
+      "name": "Respond to Extension",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        1216
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Process single job item\n// Handle webhook body structure\nconst job = $input.item.json.body ? $input.item.json.body[0] || $input.item.json : $input.item.json;\n\n// Extract job details\nconst jobData = {\n  jobUrl: job.url || job.jobUrl || '',\n  jobTitle: job.title || job.jobTitle || '',\n  jobDescription: job.description || '',\n  jobType: job.jobType || '',\n  skillLevel: job.skillLevel || '',\n  budget: job.budget || job.hourlyRange || '',\n  skills: job.skills || [],\n  clientRating: job.clientRating || '',\n  clientCountry: job.clientCountry || '',\n  questions: job.questions || [],\n  scrapedAt: job.scrapedAt || Date.now(),\n  source: job.source || {}\n};\n\nreturn { json: jobData };"
+      },
+      "id": "69cdf645-5658-4721-962a-b7a272b483de",
+      "name": "Process Job Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        1312
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const jobUrl = $input.item.json.jobUrl;\n\nif (!jobUrl) {\n  return {\n    json: {\n      skip: true,\n      reason: 'No job URL provided',\n      jobData: $input.item.json\n    }\n  };\n}\n\nconst storedProposals = $getWorkflowStaticData('global');\n\nif (!storedProposals.proposals) {\n  storedProposals.proposals = [];\n}\n\nconst existingProposal = storedProposals.proposals.find(p => p.jobUrl === jobUrl);\n\nreturn {\n  json: {\n    skip: !!existingProposal,\n    reason: existingProposal ? 'Proposal already exists' : 'New job',\n    jobData: $input.item.json\n  }\n};"
+      },
+      "id": "df813106-92c9-486c-b90e-3af5823a96e1",
+      "name": "Check if Proposal Exists",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.skip }}"
+            }
+          ]
+        }
+      },
+      "id": "02efad39-5a81-4602-b775-3daddfbd2bef",
+      "name": "Should Generate Proposal?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2064,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Prepare prompt for Gemini\nconst job = $input.item.json.jobData;\n\n// Piyush Rajput's Profile Information\nconst userProfile = {\n  name: 'Piyush Rajput',\n  skills: [\n    'MERN Stack',\n    'JavaScript',\n    'TypeScript',\n    'React.js',\n    'Node.js',\n    'Express.js',\n    'Python',\n    'C++',\n    'MongoDB',\n    'PostgreSQL',\n    'MySQL',\n    'Redis',\n    'GraphQL',\n    'AWS (EC2, S3, Lambda)',\n    'REST APIs',\n    'JWT/OAuth',\n    'Git/GitHub',\n    'Docker',\n    'Next.js',\n    'Tailwind CSS'\n  ],\n  experience: 'Motivated Computer Science Engineering student with proven experience in engineering full-stack applications, optimizing databases, and leveraging cloud technologies. Currently pursuing Bachelor of Engineering in Computer Science & Engineering (Expected Graduation: May 2026, CGPA: 7.33). Full Stack Web Development Intern at Param Info Society of I.T Services (Jan 2025 - May 2025) with hands-on experience in MERN stack development, database management, API integrations, and Agile workflows. Strong problem-solving capabilities with a track record of crafting scalable and intuitive user-centric platforms.',\n  portfolio: 'https://portfolio-46tf.vercel.app/',\n  education: 'Bachelor of Engineering in Computer Science & Engineering, Indore Institute of Science and Technology (Expected: May 2026, CGPA: 7.33)',\n  notableProjects: [\n    'Sommaire: AI-Powered PDF to Summary Application (Next.js, Langchain, Gemini AI) - https://sommaire-alpha.vercel.app/',\n    'AccessEdu: Inclusive E-Learning Platform with 100% WCAG 2.1 compliance (MERN Stack) - https://github.com/piyushh2304/accessEdu'\n  ],\n  certifications: [\n    'Amazon Academy Graduate (AWS) - Aug 2024',\n    'MERN STACK (30dayscoding) - Mar 2025',\n    'SQL AND RELATIONAL DATABASES 101 (Cognitive Class AI) - Nov 2024',\n    'Introduction To Software Engineering (Coursera) - May 2025',\n    'C/C++ Certificate (Programming World) - Sep 2022'\n  ],\n  availability: 'Available for full-time and part-time projects. Flexible hours to accommodate client timezone.'\n};\n\n// Build the prompt\nconst questionsText = job.questions && job.questions.length > 0 \n  ? `\\n\\nSCREENING QUESTIONS:\\n${job.questions.map((q, i) => `${i + 1}. ${q}`).join('\\n')}`\n  : '';\n\nconst prompt = `You are a professional freelancer writing a proposal for an Upwork job.\n\nJOB DETAILS:\nTitle: ${job.jobTitle}\nDescription: ${job.jobDescription}\nJob Type: ${job.jobType}\nSkill Level: ${job.skillLevel}\nBudget: ${job.budget}\nRequired Skills: ${job.skills.join(', ')}\nClient Rating: ${job.clientRating}\nClient Country: ${job.clientCountry}${questionsText}\n\nYOUR PROFILE:\nName: ${userProfile.name}\nEducation: ${userProfile.education}\nSkills: ${userProfile.skills.join(', ')}\nExperience: ${userProfile.experience}\nPortfolio: ${userProfile.portfolio}\nNotable Projects:\n${userProfile.notableProjects.map((p, i) => `${i + 1}. ${p}`).join('\\n')}\nCertifications: ${userProfile.certifications.join(', ')}\nAvailability: ${userProfile.availability}\n\nTASK:\nWrite a compelling, professional proposal that:\n1. Addresses the client's specific needs and requirements\n2. Highlights your relevant experience, skills, and projects that match the job\n3. Mentions specific technologies from your skillset that are relevant to this job\n4. Answers any screening questions if provided (integrate answers naturally into the proposal)\n5. Shows enthusiasm and professionalism\n6. Is concise but comprehensive (2-3 paragraphs, approximately 300-500 words)\n7. Includes a clear call to action\n8. References your portfolio or relevant projects when appropriate\n\nIMPORTANT:\n- Be specific about how your experience and projects relate to this job\n- Show that you understand the client's needs\n- Demonstrate your technical expertise with concrete examples\n- If screening questions are provided, answer them naturally within the proposal text\n- Keep the tone professional but friendly\n- End with a clear next step or call to action\n\nReturn ONLY the proposal text, no additional formatting, explanations, or meta-commentary.`;\n\n// Also prepare bid amount suggestion\nconst bidSuggestion = `Based on the job requirements (${job.skillLevel} level, ${job.budget}), suggest an appropriate bid amount. Consider:\n- The client's budget range\n- The skill level required\n- The complexity of the project\n- Your experience level\n\nReturn only a number (no currency symbols, no text).`;\n\nreturn {\n  json: {\n    prompt: prompt,\n    bidPrompt: bidSuggestion,\n    jobData: job,\n    userProfile: userProfile\n  }\n};"
+      },
+      "id": "68509323-b393-4bc5-bb99-c5f59c5047a7",
+      "name": "Prepare Gemini Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2288,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyA6G5G3VPDh-R59lav--zltGe5YELXa0Qs"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  contents: [{\n    parts: [{\n      text: $json.prompt\n    }]\n  }],\n  generationConfig: {\n    temperature: 0.7,\n    maxOutputTokens: 2000\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "ae0d305c-ec3b-4ffd-8a5d-ff9248829898",
+      "name": "Generate Proposal Text (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2512,
+        1312
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyA6G5G3VPDh-R59lav--zltGe5YELXa0Qs"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  contents: [{\n    parts: [{\n      text: $json.bidPrompt\n    }]\n  }],\n  generationConfig: {\n    temperature: 0.3,\n    maxOutputTokens: 50\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "9f9ce5bb-b9e4-4102-97c7-ebd0a5d4b0b3",
+      "name": "Suggest Bid Amount (Gemini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2512,
+        1504
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Combine proposal text and bid amount\n// Extract text from Gemini API response\nconst proposalResponse = $input.item.json;\nconst proposalText = proposalResponse?.candidates?.[0]?.content?.parts?.[0]?.text || proposalResponse?.response || proposalResponse?.text || '';\n\nconst bidResponse = $input.item.json;\nconst bidText = bidResponse?.candidates?.[0]?.content?.parts?.[0]?.text || bidResponse?.response || bidResponse?.text || '';\n\nconst jobData = $('Prepare Gemini Prompt').item.json.jobData;\n\n// Extract bid amount (remove any non-numeric characters)\nlet bidAmount = null;\nif (bidText) {\n  const bidMatch = bidText.toString().match(/\\d+/);\n  if (bidMatch) {\n    bidAmount = parseInt(bidMatch[0]);\n  }\n}\n\n// Generate screening question answers if needed\nconst screeningAnswers = [];\nif (jobData.questions && jobData.questions.length > 0) {\n  // For now, include answers in proposal text\n  // You can enhance this to extract specific answers\n  for (let i = 0; i < jobData.questions.length; i++) {\n    screeningAnswers.push(`Answer to: ${jobData.questions[i]}`);\n  }\n}\n\n// Create proposal object\nconst proposal = {\n  jobUrl: jobData.jobUrl,\n  jobTitle: jobData.jobTitle,\n  proposalText: proposalText.trim(),\n  bidAmount: bidAmount,\n  estimatedHours: null, // You can add logic to estimate hours\n  screeningAnswers: screeningAnswers,\n  generatedAt: Date.now(),\n  generatedAtHuman: new Date().toISOString(),\n  status: 'pending'\n};\n\nreturn { json: proposal };"
+      },
+      "id": "bbac60a0-9c43-479e-b7a9-fc5d8b9cb974",
+      "name": "Combine Proposal Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2736,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Store proposal in n8n workflow static data\nconst proposal = $input.item.json;\n\nconst storedProposals = $getWorkflowStaticData('global');\nif (!storedProposals.proposals) {\n  storedProposals.proposals = [];\n}\n\n// Add or update proposal\nconst existingIndex = storedProposals.proposals.findIndex(\n  p => p.jobUrl === proposal.jobUrl\n);\n\nif (existingIndex >= 0) {\n  storedProposals.proposals[existingIndex] = proposal;\n} else {\n  storedProposals.proposals.push(proposal);\n}\n\n// Keep only last 500 proposals to avoid memory issues\nif (storedProposals.proposals.length > 500) {\n  storedProposals.proposals = storedProposals.proposals.slice(-500);\n}\n\nreturn { json: { success: true, proposal: proposal } };"
+      },
+      "id": "e4863030-0b59-4d5d-8397-1228f20353d3",
+      "name": "Store Proposal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2960,
+        1408
+      ]
+    },
+    {
+      "parameters": {
+        "path": "upwork-proposals",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "4560a06b-5961-4463-8f3a-28a94dbb5d9d",
+      "name": "Get Proposals (Extension Polls)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        1728
+      ],
+      "webhookId": "upwork-proposals-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all stored proposals\nconst storedProposals = $getWorkflowStaticData('global');\n\nif (!storedProposals.proposals) {\n  storedProposals.proposals = [];\n}\n\n// Return proposals in the format expected by extension\nreturn [{\n  json: {\n    proposals: storedProposals.proposals\n  }\n}];"
+      },
+      "id": "e38961e0-9cb4-4f50-94fe-3c8421de2e71",
+      "name": "Retrieve Stored Proposals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        1728
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "611f3f6b-d920-4c84-8466-86a583b1581e",
+      "name": "Respond with Proposals",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        1728
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive Jobs from Extension": {
+      "main": [
+        [
+          {
+            "node": "Process Job Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Job Data": {
+      "main": [
+        [
+          {
+            "node": "Respond to Extension",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check if Proposal Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Proposal Exists": {
+      "main": [
+        [
+          {
+            "node": "Should Generate Proposal?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Generate Proposal?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Gemini Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Gemini Prompt": {
+      "main": [
+        [
+          {
+            "node": "Generate Proposal Text (Gemini)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Suggest Bid Amount (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Proposal Text (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Combine Proposal Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggest Bid Amount (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Combine Proposal Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Proposal Data": {
+      "main": [
+        [
+          {
+            "node": "Store Proposal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Proposals (Extension Polls)": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Stored Proposals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Stored Proposals": {
+      "main": [
+        [
+          {
+            "node": "Respond with Proposals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f4315268-5897-4788-878d-a44541d1a1eb",
+  "meta": {
+    "instanceId": "9014126434b96c55adb8c4ae2869625f0f11117fbbcc6891961b730ffc641939"
+  },
+  "id": "gcbdQc2wj1qr7Wsg",
+  "tags": []
+}

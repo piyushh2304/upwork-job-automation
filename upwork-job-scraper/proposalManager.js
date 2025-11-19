@@ -16,8 +16,9 @@ async function fetchProposalsFromN8n(webhookUrl) {
       url: webhookUrl,
     });
 
+    // Use the webhook URL directly (should be the GET proposals endpoint)
+    // e.g., https://primary-production-01db.up.railway.app/webhook/upwork-proposals
     const url = new URL(webhookUrl);
-    url.searchParams.append('action', 'get_proposals');
 
     console.log("Fetching proposals from n8n:", url.toString());
 
@@ -31,9 +32,16 @@ async function fetchProposalsFromN8n(webhookUrl) {
     });
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch proposals: HTTP ${response.status} - ${response.statusText}`
-      );
+      let errorMessage = `Failed to fetch proposals: HTTP ${response.status} - ${response.statusText}`;
+      
+      if (response.status === 404) {
+        errorMessage += "\n\nPossible causes:\n" +
+          "1. The n8n workflow is not active. Please activate it in n8n.\n" +
+          "2. The webhook URL is incorrect. Verify the URL in n8n.\n" +
+          "3. The workflow path 'upwork-proposals' doesn't match the webhook configuration.";
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();

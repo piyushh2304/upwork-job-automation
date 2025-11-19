@@ -7,11 +7,14 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "1d1c5314-dbb1-4467-a77c-3a87fd251a31",
+      "id": "822bdd14-c48f-4d1a-985f-58539c8fcf48",
       "name": "Receive Jobs from Extension",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [336, 400],
+      "position": [
+        208,
+        -560
+      ],
       "webhookId": "upwork-jobs-webhook"
     },
     {
@@ -20,21 +23,27 @@
         "responseBody": "={{ { \"success\": true, \"message\": \"Jobs received\" } }}",
         "options": {}
       },
-      "id": "bf495b69-64bc-40c9-b19e-e3027f81f1bd",
+      "id": "2058a20c-0b2f-4b3c-9410-6b92e95b6082",
       "name": "Respond to Extension",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [784, 304]
+      "position": [
+        656,
+        -656
+      ]
     },
     {
       "parameters": {
         "jsCode": "const webhookData = $input.first().json;\nconst jobs = webhookData.body || [];\nconst processedJobs = [];\n\nfor (const job of jobs) {\n  const jobData = {\n    jobUrl: job.url || job.jobUrl || '',\n    jobId: job.id || job.jobId || '',\n    jobTitle: job.title || job.jobTitle || '',\n    jobDescription: job.description || '',\n    jobType: job.jobType || '',\n    skillLevel: job.skillLevel || '',\n    budget: job.budget || job.hourlyRange || '',\n    skills: job.skills || [],\n    clientRating: job.clientRating || '',\n    clientCountry: job.clientCountry || '',\n    questions: job.questions || [],\n    scrapedAt: job.scrapedAt || Date.now()\n  };\n  processedJobs.push(jobData);\n}\n\nreturn processedJobs.map(j => ({ json: j }));"
       },
-      "id": "bedbe21b-e9ee-4a8b-999d-ca2a2c9a3bf1",
+      "id": "af50c976-2f6a-4378-9c54-70fa4cc168f3",
       "name": "Process Job Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [560, 400]
+      "position": [
+        432,
+        -560
+      ]
     },
     {
       "parameters": {
@@ -47,15 +56,17 @@
           ]
         }
       },
-      "id": "587c4d7e-b4cb-4d64-b8ad-6da4f6057f6c",
+      "id": "929a8406-1891-4777-9511-100b8b3e1d8c",
       "name": "Check Job URL Exists",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [784, 496]
+      "position": [
+        656,
+        -464
+      ]
     },
     {
       "parameters": {
-        "operation": "read",
         "documentId": {
           "__rl": true,
           "value": "16gUptMWh9fq6o6l1bzbbhh-EVD4axxX2m_puIZib8G0",
@@ -66,32 +77,38 @@
           "value": "piyush",
           "mode": "name"
         },
-        "options": {
-          "useFirstRowAsHeaders": true
-        }
+        "options": {}
       },
-      "id": "a556589e-e3fa-4661-a571-518c0703c1d6",
+      "id": "33b8ac0a-cddc-429d-9444-b4d494144db5",
       "name": "Get Existing URLs (Sheets)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 3,
-      "position": [1008, 496],
+      "position": [
+        880,
+        -464
+      ],
       "alwaysOutputData": true,
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "6n5tUVcfGaUshmmI",
-          "name": "Google Sheets account 2"
+          "id": "MM0z2EwuJEwRwLDk",
+          "name": "Google Sheets account"
         }
-      }
+      },
+      "continueOnFail": true,
+      "notes": "If this fails, the workflow will continue and assume no existing jobs"
     },
     {
       "parameters": {
-        "jsCode": "const currentJob = $('Process Job Data').first().json;\nconst sheetRows = $input.all();\n\nif (!sheetRows || sheetRows.length === 0) {\n  return [{ json: { skip: false, jobData: currentJob } }];\n}\n\nconst existingUrls = sheetRows.map(row => row.json.jobUrl || row.json.Job_URL || Object.values(row.json)[0]).filter(url => url && String(url).trim() !== '');\nconst jobExists = existingUrls.some(url => String(url).trim() === String(currentJob.jobUrl).trim());\n\nreturn [{ json: { skip: jobExists, jobData: currentJob } }];"
+        "jsCode": "const currentJob = $('Process Job Data').first().json;\nconst sheetRows = $input.all();\n\n// If sheets read failed or returned no data, assume no existing jobs\nif (!sheetRows || sheetRows.length === 0) {\n  console.log('No existing URLs found (sheets may be unavailable or empty)');\n  return [{ json: { skip: false, jobData: currentJob } }];\n}\n\n// Check if the input contains an error (from failed sheets read)\nconst hasError = sheetRows.some(row => row.json && (row.json.error || row.json.message));\nif (hasError) {\n  console.log('Sheets read had errors, assuming no existing jobs to avoid duplicates');\n  return [{ json: { skip: false, jobData: currentJob } }];\n}\n\nconst existingUrls = sheetRows.map(row => row.json.jobUrl || row.json.Job_URL || Object.values(row.json)[0]).filter(url => url && String(url).trim() !== '');\nconst jobExists = existingUrls.some(url => String(url).trim() === String(currentJob.jobUrl).trim());\n\nreturn [{ json: { skip: jobExists, jobData: currentJob } }];"
       },
-      "id": "c5f7dc60-8a18-4a44-a57e-d627c7c91045",
+      "id": "e1300b7d-9144-4ae0-982a-bfcfeef2f80b",
       "name": "Check if Proposal Exists",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1232, 496]
+      "position": [
+        1104,
+        -464
+      ]
     },
     {
       "parameters": {
@@ -103,72 +120,73 @@
           ]
         }
       },
-      "id": "7a1d3e82-b0f7-4241-979b-2a29bd5f0103",
+      "id": "e7d12db5-306d-4530-aa16-5b9d6e0f6366",
       "name": "Should Generate Proposal?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1456, 496]
+      "position": [
+        1328,
+        -464
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const job = $json.jobData;\nconst userProfile = {\n  name: 'Piyush Rajput',\n  skills: ['MERN Stack','JavaScript','TypeScript','React.js','Node.js','Express.js','Python','C++','MongoDB','MySQL','PostgreSQL','Redis','AWS','REST APIs','JWT/OAuth','Docker','Next.js','Tailwind'],\n  experience: 'Motivated Computer Science Engineering student with full-stack development experience.',\n  portfolio: 'https://portfolio-46tf.vercel.app/'\n};\n\nconst qText = job.questions.length > 0 ? `\\nSCREENING QUESTIONS:\\n${job.questions.map((q,i)=>`${i+1}. ${q}`).join('\\n')}` : '';\n\nconst prompt = `Write an Upwork proposal. Job: ${job.jobTitle}. Description: ${job.jobDescription}. Budget: ${job.budget}. Skills: ${job.skills.join(', ')}. Country: ${job.clientCountry}.${qText}\\nProfile: ${userProfile.name}, Skills: ${userProfile.skills.join(', ')}. Portfolio: ${userProfile.portfolio}. Write a 300-500 word proposal.`;\nconst bidPrompt = `Suggest a bid amount for this job: ${job.budget}. Return only a number.`;\n\nreturn [{ json: { prompt, bidPrompt, jobData: job } }];"
+        "jsCode": "const job = $json.jobData;\nconst userProfile = {\n  name: 'Piyush Rajput',\n  skills: ['MERN Stack','JavaScript','TypeScript','React.js','Node.js','Express.js','Python','C++','MongoDB','MySQL','PostgreSQL','Redis','AWS','REST APIs','JWT/OAuth','Docker','Next.js','Tailwind'],\n  experience: 'Motivated Computer Science Engineering student with full-stack development experience.',\n  portfolio: 'https://portfolio-46tf.vercel.app/'\n};\n\nconst qText = job.questions.length > 0 ? `\\nSCREENING QUESTIONS:\\n${job.questions.map((q,i)=>`${i+1}. ${q}`).join('\\n')}` : '';\n\nconst prompt = `Write an Upwork proposal. Job: ${job.jobTitle}. Description: ${job.jobDescription}. Budget: ${job.budget}. Skills: ${job.skills.join(', ')}. Country: ${job.clientCountry}.${qText}\\nProfile: ${userProfile.name}, Skills: ${userProfile.skills.join(', ')}. Portfolio: ${userProfile.portfolio}. Write a 300-500 word proposal.`;\n\nreturn [{ json: { prompt, jobData: job } }];"
       },
-      "id": "1f0c37ff-4548-4304-8d52-5d60f2a80f1a",
+      "id": "e097518c-2859-4c9d-bedc-69cc74c3bebd",
       "name": "Prepare Gemini Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1680, 496]
+      "position": [
+        1552,
+        -464
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=AIzaSyBIVMjQDZsrTu1TJBYqprFreuwG6DveLWM",
-        "sendQuery": false,
+        "url": "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=AIzaSyBIVMjQDZsrTu1TJBYqprFreuwG6DveLWM",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { contents:[{parts:[{text:$json.prompt}]}], generationConfig:{temperature:0.7,maxOutputTokens:2000} } }}"
+        "jsonBody": "={{ { contents:[{parts:[{text:$json.prompt}]}], generationConfig:{temperature:0.7,maxOutputTokens:2000} } }}",
+        "options": {}
       },
-      "id": "720d461c-7fb7-4fb9-a989-74c30b180465",
+      "id": "e4f00a54-380d-4b98-8bf4-be2a2819b5f5",
       "name": "Generate Proposal Text (Gemini)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1904, 400]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=AIzaSyBIVMjQDZsrTu1TJBYqprFreuwG6DveLWM",
-        "sendQuery": false,
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { contents:[{parts:[{text:$('Prepare Gemini Prompt').first().json.bidPrompt}]}], generationConfig:{temperature:0.2,maxOutputTokens:20} } }}"
-      },
-      "id": "12896d81-5c55-471c-ba8e-610b5c01295a",
-      "name": "Suggest Bid Amount (Gemini)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1904, 592]
+      "position": [
+        1776,
+        -560
+      ]
     },
     {
       "parameters": {
         "amount": 3,
         "unit": "seconds"
       },
-      "id": "wait-node-rate-limit",
+      "id": "73a151cc-81ee-437f-808c-e1e15c5b0b86",
       "name": "Wait for Rate Limit",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [1904, 496]
+      "position": [
+        1776,
+        -464
+      ],
+      "webhookId": "4b2094b4-94c0-4cf9-90ac-defa8388a196"
     },
     {
       "parameters": {
-        "jsCode": "// Combine proposal, bid, and all job data\n// Get proposal text from Generate Proposal Text node\nconst proposalNode = $('Generate Proposal Text (Gemini)').first();\nconst proposalText = proposalNode?.json?.candidates?.[0]?.content?.parts?.[0]?.text || '';\n\n// Get bid from current input (Suggest Bid Amount node)\nconst bidNode = $input.first();\nconst bidRaw = bidNode?.json?.candidates?.[0]?.content?.parts?.[0]?.text || '';\n\n// Get job data from Prepare Gemini Prompt node\nconst promptNode = $('Prepare Gemini Prompt').first();\nconst job = promptNode.json.jobData || {};\n\nconst bidAmount = parseInt((bidRaw || '').replace(/\\D/g, '')) || '';\n\n// Ensure all required columns are present with default values\nconst formattedJob = {\n  jobUrl: job.jobUrl || '',\n  jobId: job.jobId || '',\n  jobTitle: job.jobTitle || '',\n  jobDescription: job.jobDescription || '',\n  jobType: job.jobType || '',\n  skillLevel: job.skillLevel || '',\n  budget: job.budget || '',\n  skills: Array.isArray(job.skills) ? job.skills.join(', ') : (job.skills || ''),\n  clientRating: job.clientRating || '',\n  clientCountry: job.clientCountry || '',\n  questions: Array.isArray(job.questions) ? job.questions.join(' | ') : (job.questions || ''),\n  proposalText: proposalText || '',\n  bidAmount: bidAmount || '',\n  generatedAt: new Date().toISOString(),\n  scrapedAt: job.scrapedAt || Date.now()\n};\n\nreturn [{ json: formattedJob }];"
+        "jsCode": "// Combine proposal and all job data\n// Get proposal text from Generate Proposal Text node\nconst proposalNode = $('Generate Proposal Text (Gemini)').first();\nconst proposalText = proposalNode?.json?.candidates?.[0]?.content?.parts?.[0]?.text || '';\n\n// Get job data from Prepare Gemini Prompt node\nconst promptNode = $('Prepare Gemini Prompt').first();\nconst job = promptNode.json.jobData || {};\n\n// Ensure all required columns are present with default values\nconst formattedJob = {\n  jobUrl: job.jobUrl || '',\n  jobId: job.jobId || '',\n  jobTitle: job.jobTitle || '',\n  jobDescription: job.jobDescription || '',\n  jobType: job.jobType || '',\n  skillLevel: job.skillLevel || '',\n  budget: job.budget || '',\n  skills: Array.isArray(job.skills) ? job.skills.join(', ') : (job.skills || ''),\n  clientRating: job.clientRating || '',\n  clientCountry: job.clientCountry || '',\n  questions: Array.isArray(job.questions) ? job.questions.join(' | ') : (job.questions || ''),\n  proposalText: proposalText || '',\n  generatedAt: new Date().toISOString(),\n  scrapedAt: job.scrapedAt || Date.now()\n};\n\nreturn [{ json: formattedJob }];"
       },
-      "id": "de0592f2-e0e0-4297-a2c8-1e1de73b26eb",
+      "id": "1aef38b0-262e-4644-91b2-e9331aa5bf53",
       "name": "Combine Proposal Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2128, 496]
+      "position": [
+        2000,
+        -464
+      ]
     },
     {
       "parameters": {
@@ -183,59 +201,426 @@
           "value": "piyush",
           "mode": "name"
         },
+        "dataMode": "autoMapInputData",
         "columnToMatchOn": "jobUrl",
-        "dataMode": "define",
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "jobUrl": "={{ $json.jobUrl }}",
-            "jobId": "={{ $json.jobId }}",
-            "jobTitle": "={{ $json.jobTitle }}",
-            "jobDescription": "={{ $json.jobDescription }}",
-            "jobType": "={{ $json.jobType }}",
-            "skillLevel": "={{ $json.skillLevel }}",
-            "budget": "={{ $json.budget }}",
-            "skills": "={{ $json.skills }}",
-            "clientRating": "={{ $json.clientRating }}",
-            "clientCountry": "={{ $json.clientCountry }}",
-            "questions": "={{ $json.questions }}",
-            "proposalText": "={{ $json.proposalText }}",
-            "bidAmount": "={{ $json.bidAmount }}",
-            "generatedAt": "={{ $json.generatedAt }}",
-            "scrapedAt": "={{ $json.scrapedAt }}"
-          }
-        },
-        "options": {
-          "useFirstRowAsHeaders": true
-        }
+        "options": {}
       },
-      "id": "2a67eee1-d4cc-47db-ad3f-b2dac79d7607",
+      "id": "441958e0-5a7f-45f1-9daa-57679d313722",
       "name": "Save Proposal (Sheets Append)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 3,
-      "position": [2352, 496],
+      "position": [
+        2224,
+        -464
+      ],
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "6n5tUVcfGaUshmmI",
-          "name": "Google Sheets account 2"
+          "id": "MM0z2EwuJEwRwLDk",
+          "name": "Google Sheets account"
         }
       }
+    },
+    {
+      "parameters": {
+        "path": "upwork-proposals",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e4b60ed3-6b3d-4ec3-a9c4-c885931eb701",
+      "name": "Get Proposals (Extension)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        208,
+        -160
+      ],
+      "webhookId": "upwork-proposals-get-webhook"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "16gUptMWh9fq6o6l1bzbbhh-EVD4axxX2m_puIZib8G0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "piyush",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "4dd66fcb-ed14-492d-956e-4a0a97389c6f",
+      "name": "Read All Proposals (Sheets)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        432,
+        -160
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MM0z2EwuJEwRwLDk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format proposals from Google Sheets for extension\nconst sheetRows = $input.all();\nconst proposals = [];\n\nfor (const row of sheetRows) {\n  const data = row.json;\n  \n  // Skip rows without jobUrl or proposalText\n  if (!data.jobUrl || !data.proposalText) {\n    continue;\n  }\n  \n  // Parse questions if they're stored as a string\n  let questions = [];\n  if (data.questions) {\n    if (typeof data.questions === 'string') {\n      questions = data.questions.split(' | ').filter(q => q.trim());\n    } else if (Array.isArray(data.questions)) {\n      questions = data.questions;\n    }\n  }\n  \n  // Parse skills if they're stored as a string\n  let skills = [];\n  if (data.skills) {\n    if (typeof data.skills === 'string') {\n      skills = data.skills.split(',').map(s => s.trim()).filter(s => s);\n    } else if (Array.isArray(data.skills)) {\n      skills = data.skills;\n    }\n  }\n  \n  const proposal = {\n    jobUrl: data.jobUrl || '',\n    jobId: data.jobId || '',\n    jobTitle: data.jobTitle || '',\n    jobDescription: data.jobDescription || '',\n    jobType: data.jobType || '',\n    skillLevel: data.skillLevel || '',\n    budget: data.budget || '',\n    skills: skills,\n    clientRating: data.clientRating || '',\n    clientCountry: data.clientCountry || '',\n    questions: questions,\n    proposalText: data.proposalText || '',\n    generatedAt: data.generatedAt || '',\n    scrapedAt: data.scrapedAt || Date.now(),\n    status: 'pending' // Default status for auto-submission\n  };\n  \n  proposals.push(proposal);\n}\n\nreturn [{ json: { proposals: proposals } }];"
+      },
+      "id": "47fae622-8673-494a-97e7-e6208a6e2c57",
+      "name": "Format Proposals for Extension",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "c27e99ab-2236-46b2-bdb6-cb81f5f37546",
+      "name": "Respond with Proposals",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "delete-job",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "bebc3939-66d2-4bb1-af22-bec96998c584",
+      "name": "Delete Job Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        208,
+        256
+      ],
+      "webhookId": "delete-job-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract jobUrl and jobId from webhook request\nconst webhookData = $input.first().json;\nconst jobUrl = webhookData.jobUrl || webhookData.body?.jobUrl || '';\nconst jobId = webhookData.jobId || webhookData.body?.jobId || '';\n\nif (!jobUrl && !jobId) {\n  return [{ json: { error: 'jobUrl or jobId is required', success: false } }];\n}\n\nreturn [{ json: { jobUrl, jobId, success: true } }];"
+      },
+      "id": "c87c4cc4-5f4b-4535-95df-7ce65cb7fcfd",
+      "name": "Extract Delete Job Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "16gUptMWh9fq6o6l1bzbbhh-EVD4axxX2m_puIZib8G0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "piyush",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "e88d6706-de8f-4e44-a245-55b0ee800b20",
+      "name": "Read Sheets for Delete",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        656,
+        256
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MM0z2EwuJEwRwLDk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find the row index to delete\nconst deleteData = $('Extract Delete Job Data').first().json;\nconst sheetRows = $input.all();\n\nif (!deleteData.jobUrl && !deleteData.jobId) {\n  return [{ json: { error: 'No jobUrl or jobId provided', success: false } }];\n}\n\n// Find matching row\nlet rowIndex = null;\nfor (let i = 0; i < sheetRows.length; i++) {\n  const row = sheetRows[i].json;\n  const rowJobUrl = row.jobUrl || row.Job_URL || '';\n  const rowJobId = row.jobId || row.Job_ID || '';\n  \n  // Match by jobUrl (preferred) or jobId\n  if (deleteData.jobUrl && rowJobUrl && String(rowJobUrl).trim() === String(deleteData.jobUrl).trim()) {\n    rowIndex = i + 2; // +2 because: +1 for header row, +1 for 1-based index\n    break;\n  } else if (deleteData.jobId && rowJobId && String(rowJobId).trim() === String(deleteData.jobId).trim()) {\n    rowIndex = i + 2;\n    break;\n  }\n}\n\nif (rowIndex === null) {\n  return [{ json: { error: 'Job not found in sheets', success: false, jobUrl: deleteData.jobUrl, jobId: deleteData.jobId } }];\n}\n\nreturn [{ json: { rowIndex, jobUrl: deleteData.jobUrl, jobId: deleteData.jobId, success: true } }];"
+      },
+      "id": "de1c8329-7347-4ad2-b64c-4c08c09162aa",
+      "name": "Find Row to Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "__rl": true,
+          "value": "16gUptMWh9fq6o6l1bzbbhh-EVD4axxX2m_puIZib8G0",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "piyush",
+          "mode": "name"
+        },
+        "rowNumber": "={{ $json.rowIndex }}",
+        "options": {}
+      },
+      "id": "c6cd146e-0a50-4a1d-96bb-e0278caf61e5",
+      "name": "Delete Row from Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        1104,
+        256
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "MM0z2EwuJEwRwLDk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Job deleted successfully\", \"jobUrl\": $json.jobUrl, \"jobId\": $json.jobId } }}",
+        "options": {}
+      },
+      "id": "fda3135a-3b38-4303-81bb-cfaeeeb6e5a1",
+      "name": "Respond Delete Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        256
+      ]
     }
   ],
   "connections": {
-    "Receive Jobs from Extension": { "main": [[{"node": "Process Job Data", "type": "main", "index": 0}]] },
-    "Process Job Data": { "main": [[{"node": "Respond to Extension", "type": "main", "index": 0},{"node": "Check Job URL Exists","type":"main","index":0}]] },
-    "Check Job URL Exists": { "main": [[{"node": "Get Existing URLs (Sheets)","type":"main","index":0}]] },
-    "Get Existing URLs (Sheets)": { "main": [[{"node": "Check if Proposal Exists","type":"main","index":0}]] },
-    "Check if Proposal Exists": { "main": [[{"node": "Should Generate Proposal?","type":"main","index":0}]] },
-    "Should Generate Proposal?": { "main": [[{"node": "Prepare Gemini Prompt","type":"main","index":0}]] },
-    "Prepare Gemini Prompt": { "main": [[{"node": "Generate Proposal Text (Gemini)","type":"main","index":0}]] },
-    "Generate Proposal Text (Gemini)": { "main": [[{"node": "Wait for Rate Limit","type":"main","index":0}]] },
-    "Wait for Rate Limit": { "main": [[{"node": "Suggest Bid Amount (Gemini)","type":"main","index":0}]] },
-    "Suggest Bid Amount (Gemini)": { "main": [[{"node": "Combine Proposal Data","type":"main","index":0}]] },
-    "Combine Proposal Data": { "main": [[{"node": "Save Proposal (Sheets Append)","type":"main","index":0}]] }
+    "Receive Jobs from Extension": {
+      "main": [
+        [
+          {
+            "node": "Process Job Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Job Data": {
+      "main": [
+        [
+          {
+            "node": "Respond to Extension",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Job URL Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Job URL Exists": {
+      "main": [
+        [
+          {
+            "node": "Get Existing URLs (Sheets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Existing URLs (Sheets)": {
+      "main": [
+        [
+          {
+            "node": "Check if Proposal Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Proposal Exists": {
+      "main": [
+        [
+          {
+            "node": "Should Generate Proposal?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Generate Proposal?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Gemini Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Gemini Prompt": {
+      "main": [
+        [
+          {
+            "node": "Generate Proposal Text (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Proposal Text (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Rate Limit": {
+      "main": [
+        [
+          {
+            "node": "Combine Proposal Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Proposal Data": {
+      "main": [
+        [
+          {
+            "node": "Save Proposal (Sheets Append)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Proposals (Extension)": {
+      "main": [
+        [
+          {
+            "node": "Read All Proposals (Sheets)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read All Proposals (Sheets)": {
+      "main": [
+        [
+          {
+            "node": "Format Proposals for Extension",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Proposals for Extension": {
+      "main": [
+        [
+          {
+            "node": "Respond with Proposals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Job Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Delete Job Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Delete Job Data": {
+      "main": [
+        [
+          {
+            "node": "Read Sheets for Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Sheets for Delete": {
+      "main": [
+        [
+          {
+            "node": "Find Row to Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Row to Delete": {
+      "main": [
+        [
+          {
+            "node": "Delete Row from Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Row from Sheets": {
+      "main": [
+        [
+          {
+            "node": "Respond Delete Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
+  "pinData": {},
   "meta": {
-    "instanceId": "9014126434b96c55adb8c4ae2869625f0f11117fbbcc6891961b730ffc641939"
+    "instanceId": "ceadf33073f8e804a1d75dcc991d503f4764cdf188f1f8b96cc3101a45bf238f"
   }
 }

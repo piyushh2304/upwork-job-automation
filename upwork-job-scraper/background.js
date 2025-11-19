@@ -783,7 +783,37 @@ try {
       } else if (message.type === "getProposalForJob") {
         handled = true;
         handleAsyncOperation(async () => {
-          const proposal = await getProposalForJob(message.jobUrl);
+          // Try to find proposal by jobUrl first
+          let proposal = await getProposalForJob(message.jobUrl);
+          
+          // If not found and jobId is provided, try matching by jobId
+          if (!proposal && message.jobId) {
+            const proposals = await getAllStoredProposals();
+            proposal = proposals.find((p) => p.jobId === message.jobId);
+          }
+          
+          // If still not found, try normalized URL matching
+          if (!proposal && message.jobUrl) {
+            const proposals = await getAllStoredProposals();
+            const normalizeUrl = (url) => {
+              try {
+                const u = new URL(url);
+                u.hostname = u.hostname.replace(/^www\./, "");
+                u.search = "";
+                u.hash = "";
+                return u.toString();
+              } catch {
+                return url.split("?")[0].split("#")[0];
+              }
+            };
+            const normalizedJobUrl = normalizeUrl(message.jobUrl);
+            proposal = proposals.find((p) => {
+              if (!p.jobUrl) return false;
+              const normalizedProposalUrl = normalizeUrl(p.jobUrl);
+              return normalizedProposalUrl === normalizedJobUrl;
+            });
+          }
+          
           return { proposal: proposal };
         });
         return true; // Respond asynchronously
@@ -834,6 +864,45 @@ try {
         handleAsyncOperation(async () => {
           await markJobAsSubmitted(message.jobUrl, message.success);
           return {};
+        });
+        return true; // Respond asynchronously
+      } else if (message.type === "addJobsToQueue") {
+        handled = true;
+        handleAsyncOperation(async () => {
+          if (typeof addJobsToSubmissionQueue === "function") {
+            await addJobsToSubmissionQueue();
+          }
+          return {};
+        });
+        return true; // Respond asynchronously
+      } else if (message.type === "addJobsToQueueFromProposals") {
+        handled = true;
+        handleAsyncOperation(async () => {
+          // Add jobs directly from proposals to queue
+          const proposals = message.proposals || [];
+          const data = await chrome.storage.local.get(["submissionQueue"]);
+          const currentQueue = data.submissionQueue || [];
+          const existingUrls = new Set(currentQueue.map((j) => j.jobUrl));
+          
+          const newJobs = [];
+          for (const proposal of proposals) {
+            if (proposal.jobUrl && !existingUrls.has(proposal.jobUrl)) {
+              newJobs.push({
+                jobUrl: proposal.jobUrl,
+                jobTitle: proposal.jobTitle || '',
+                addedAt: Date.now(),
+              });
+            }
+          }
+          
+          if (newJobs.length > 0) {
+            const updatedQueue = [...currentQueue, ...newJobs];
+            await chrome.storage.local.set({ submissionQueue: updatedQueue });
+            console.log(`Added ${newJobs.length} jobs to submission queue from proposals`);
+            addToActivityLog(`Added ${newJobs.length} job(s) to queue`);
+          }
+          
+          return { added: newJobs.length };
         });
         return true; // Respond asynchronously
       } else if (message.type === "startAutoSubmission") {

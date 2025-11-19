@@ -76,95 +76,156 @@ async function fillProposalForm(proposal) {
     console.log("Starting proposal auto-fill for job:", proposal.jobUrl);
     addToActivityLog(`Attempting to auto-fill proposal for job`);
 
+    // Scroll to bottom of page to find cover letter field (it's at the bottom)
+    console.log("=== Scrolling to bottom of page to find cover letter ===");
+    window.scrollTo(0, document.body.scrollHeight);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Scroll a bit more to ensure we're at the very bottom
+    window.scrollTo(0, document.body.scrollHeight + 500);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Also try scrolling the main content area if it exists
+    const mainContent = document.querySelector('main, [role="main"], .main-content, #main-content');
+    if (mainContent) {
+      mainContent.scrollTop = mainContent.scrollHeight;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    console.log("Reached bottom of page, looking for cover letter field...");
+
     // Wait for the proposal form to load
-    // Upwork proposal form selectors (these may need adjustment based on actual Upwork structure)
-    const proposalTextSelector =
-      'textarea[name="coverLetter"], textarea[data-test="cover-letter"], textarea.air3-textarea, textarea#cover-letter';
-    const bidAmountSelector =
-      'input[name="bidAmount"], input[data-test="bid-amount"], input#bid-amount';
-    const estimatedHoursSelector =
-      'input[name="estimatedHours"], input[data-test="estimated-hours"]';
+    // Upwork proposal form selectors - using exact selector from Upwork
+    const coverLetterSelectors = [
+      'textarea[aria-labelledby="cover_letter_label"]',
+      'textarea.air3-textarea.inner-textarea',
+      'textarea.air3-textarea[aria-labelledby="cover_letter_label"]',
+      'textarea[data-v-cf0298f4][aria-labelledby="cover_letter_label"]',
+      'textarea.air3-textarea',
+      'textarea[name="coverLetter"]',
+      'textarea[data-test="cover-letter"]',
+      'textarea#cover-letter'
+    ];
 
     let filledFields = 0;
 
-    // Fill proposal text (cover letter)
-    if (proposal.proposalText) {
-      try {
-        const proposalTextElement = await waitForElement(
-          proposalTextSelector,
-          5000
-        );
-        fillField(proposalTextElement, proposal.proposalText);
-        filledFields++;
-        console.log("Filled proposal text field");
-      } catch (error) {
-        console.warn("Could not find proposal text field:", error.message);
-      }
-    }
-
-    // Fill bid amount if provided
-    if (proposal.bidAmount) {
-      try {
-        const bidAmountElement = await waitForElement(bidAmountSelector, 3000);
-        fillField(bidAmountElement, proposal.bidAmount.toString());
-        filledFields++;
-        console.log("Filled bid amount field");
-      } catch (error) {
-        console.warn("Could not find bid amount field:", error.message);
-      }
-    }
-
-    // Fill estimated hours if provided
-    if (proposal.estimatedHours) {
-      try {
-        const estimatedHoursElement = await waitForElement(
-          estimatedHoursSelector,
-          3000
-        );
-        fillField(estimatedHoursElement, proposal.estimatedHours.toString());
-        filledFields++;
-        console.log("Filled estimated hours field");
-      } catch (error) {
-        console.warn("Could not find estimated hours field:", error.message);
-      }
-    }
-
-    // Handle screening questions if provided
-    if (proposal.screeningAnswers && Array.isArray(proposal.screeningAnswers)) {
-      for (let i = 0; i < proposal.screeningAnswers.length; i++) {
-        const answer = proposal.screeningAnswers[i];
+    // Fill proposal text (cover letter) - this is the main goal
+    // Extract proposalText exactly as it comes from Google Sheets via n8n
+    // n8n extracts: proposalText: data.proposalText || ''
+    const proposalText = proposal.proposalText || '';
+    
+    if (proposalText && proposalText.trim()) {
+      console.log("=== Extracting proposalText from proposal object ===");
+      console.log("Proposal object keys:", Object.keys(proposal));
+      console.log("Proposal text extracted (length):", proposalText.length);
+      console.log("Proposal text preview:", proposalText.substring(0, 150) + "...");
+      console.log("Looking for cover letter field to fill...");
+      
+      let foundElement = null;
+      
+      // Try each selector (after scrolling to bottom)
+      for (const selector of coverLetterSelectors) {
         try {
-          // Try to find question input by index or data attribute
-          const questionSelector = `textarea[data-question-index="${i}"], textarea[name="question-${i}"], .screening-question textarea`;
-          const questionElement = await waitForElement(questionSelector, 3000);
-          fillField(questionElement, answer);
-          filledFields++;
-          console.log(`Filled screening question ${i}`);
-        } catch (error) {
-          console.warn(`Could not find screening question ${i}:`, error.message);
+          const element = document.querySelector(selector);
+          if (element) {
+            // Scroll element into view
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            if (element.offsetParent !== null) {
+              foundElement = element;
+              console.log(`Found cover letter field with selector: ${selector}`);
+              break;
+            }
+          }
+        } catch (e) {
+          continue;
         }
       }
+      
+      // If not found immediately, wait for it and scroll more
+      if (!foundElement) {
+        console.log("Cover letter field not found immediately, waiting and scrolling more...");
+        
+        // Scroll to absolute bottom again
+        window.scrollTo(0, document.documentElement.scrollHeight);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        for (const selector of coverLetterSelectors.slice(0, 5)) {
+          try {
+            foundElement = await waitForElement(selector, 5000);
+            if (foundElement) {
+              // Scroll element into view
+              foundElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              if (foundElement.offsetParent !== null) {
+                console.log(`Found cover letter field with selector (after wait): ${selector}`);
+                break;
+              }
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+      
+      if (foundElement) {
+        try {
+          // Ensure element is in view before filling
+          foundElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          console.log("Filling cover letter field with proposalText from Google Sheets...");
+          fillField(foundElement, proposalText);
+          filledFields++;
+          console.log("✓ Filled cover letter field successfully");
+          
+          // Verify it was filled
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const currentValue = foundElement.value || foundElement.textContent || '';
+          if (currentValue.length > 0) {
+            console.log(`✓ Verified: Cover letter has ${currentValue.length} characters`);
+          } else {
+            console.warn("⚠ Warning: Cover letter field appears empty after filling");
+          }
+        } catch (error) {
+          console.error("Error filling cover letter:", error);
+        }
+      } else {
+        console.error("❌ Could not find cover letter field with any selector");
+        console.error("Tried selectors:", coverLetterSelectors);
+      }
+    } else {
+      console.warn("No proposal text provided!");
     }
 
+    // Only fill cover letter - skip other fields
+    // (Bid amount, estimated hours, and screening questions are not auto-filled)
+    
     if (filledFields > 0) {
-      if (typeof addToActivityLog === "function") {
-        addToActivityLog(
-          `Auto-filled ${filledFields} field(s) in proposal form`
-        );
-      }
-      console.log(`Successfully filled ${filledFields} field(s)`);
-
+      console.log(`✓ Successfully filled ${filledFields} field(s)`);
+      
       // Update proposal status
       chrome.runtime.sendMessage({
         type: "updateProposalStatus",
         jobUrl: proposal.jobUrl,
         status: "filled",
       });
-
+      
       // Show notification to user
-      showAutoFillNotification(filledFields);
+      if (typeof showAutoFillNotification === "function") {
+        showAutoFillNotification(filledFields);
+      }
+      
+      if (typeof addToActivityLog === "function") {
+        addToActivityLog(`Auto-filled ${filledFields} field(s) for proposal`);
+      }
     } else {
-      throw new Error("No fields were filled. Form structure may have changed.");
+      console.warn("No fields were filled");
+      if (typeof addToActivityLog === "function") {
+        addToActivityLog("Auto-fill attempted but no fields were filled");
+      }
     }
   } catch (error) {
     console.error("Error filling proposal form:", error);
@@ -230,8 +291,19 @@ async function checkAndFillProposal() {
     console.log("Detected Upwork proposal page, checking for proposal data");
 
     // Extract job URL from current page
-    // Upwork proposal pages typically have the job URL in the page
+    // For apply pages, extract job ID from URL and construct job URL
     let jobUrl = currentUrl;
+    let jobId = null;
+    
+    // Extract job ID from apply URL: /proposals/job/~021990106921915111448/apply/
+    const jobIdMatch = currentUrl.match(/\/job\/(~[0-9]+)\//);
+    if (jobIdMatch) {
+      jobId = jobIdMatch[1];
+      // Construct job URL from job ID
+      jobUrl = `https://www.upwork.com/jobs/${jobId}/`;
+      console.log("Extracted job ID:", jobId);
+      console.log("Constructed job URL:", jobUrl);
+    }
 
     // Try to extract job URL from page elements or URL
     const jobLinkElement = document.querySelector(
@@ -241,27 +313,29 @@ async function checkAndFillProposal() {
       jobUrl = jobLinkElement.href;
     }
 
-    // Get proposal for this job
+    // Get proposal for this job - try multiple matching strategies
     const response = await chrome.runtime.sendMessage({
       type: "getProposalForJob",
       jobUrl: jobUrl,
+      jobId: jobId,
     });
 
     if (response && response.proposal) {
       const proposal = response.proposal;
 
       // Check if proposal hasn't been filled yet
-      if (proposal.status !== "filled") {
+      if (proposal.status !== "filled" && proposal.status !== "submitted") {
         console.log("Found proposal for this job, starting auto-fill");
         // Wait a bit for the form to fully load
         setTimeout(() => {
           fillProposalForm(proposal);
         }, 2000);
       } else {
-        console.log("Proposal already filled for this job");
+        console.log("Proposal already filled/submitted for this job");
       }
     } else {
-      console.log("No proposal found for this job");
+      console.log("No proposal found for this job (this is normal if using auto-submission)");
+      // Don't show error - auto-submission will handle it via messages
     }
   } catch (error) {
     console.error("Error checking and filling proposal:", error);

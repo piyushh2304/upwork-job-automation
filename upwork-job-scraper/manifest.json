@@ -53,7 +53,8 @@
         "webhook.js",
         "jobScraping.js",
         "proposalAutoFill.js",
-        "proposalAutoSubmit.js"
+        "proposalAutoSubmit.js",
+        "PiyushRajputResume.pdf"
       ],
       "matches": ["https://*.upwork.com/*"]
     }

@@ -1715,14 +1715,49 @@ async function startAutoSubmission() {
       document.getElementById("auto-submission-toggle").checked = true;
     });
 
-    // Add jobs to queue and start processing
+    // First, fetch proposals from n8n
+    addToActivityLog("Fetching proposals from n8n...");
+    showAlert("Fetching proposals from n8n...", "info");
+
+    // Use the GET proposals endpoint URL directly
+    const proposalsGetUrl = "https://primary-production-01db.up.railway.app/webhook/upwork-proposals";
+
+    // Fetch proposals from n8n
+    const proposals = await fetchProposalsFromN8n(proposalsGetUrl);
+
+    if (!proposals || proposals.length === 0) {
+      showAlert("No proposals found in n8n. Please generate proposals first.", "warning");
+      addToActivityLog("No proposals found in n8n");
+      return;
+    }
+
+    addToActivityLog(`Fetched ${proposals.length} proposal(s) from n8n`);
+
+    // Store proposals locally
+    await storeProposals(proposals);
+    addToActivityLog(`Stored ${proposals.length} proposal(s) locally`);
+
+    // Add jobs to submission queue directly from proposals
+    const queueResponse = await sendMessageToBackground({
+      type: "addJobsToQueueFromProposals",
+      proposals: proposals
+    });
+
+    if (!queueResponse || !queueResponse.success) {
+      console.warn("Failed to add jobs to queue, but continuing...");
+      addToActivityLog("Warning: Failed to add jobs to queue");
+    } else {
+      addToActivityLog(`Added ${proposals.length} job(s) to submission queue`);
+    }
+
+    // Start processing the queue
     const response = await sendMessageToBackground({
       type: "startAutoSubmission",
     });
 
     if (response && response.success) {
-      showAlert("Auto-submission started! Processing jobs...", "success");
-      addToActivityLog("Auto-submission queue processing started");
+      showAlert(`Auto-submission started! Processing ${proposals.length} job(s)...`, "success");
+      addToActivityLog(`Auto-submission queue processing started with ${proposals.length} job(s)`);
     } else {
       throw new Error(response?.error || "Failed to start auto-submission");
     }
